@@ -1,27 +1,40 @@
 #!/usr/bin/env node
 
-import { Command } from 'commander';
 import { createProject } from '../src/main.js';
-import chalk from 'chalk';
+import inquirer from 'inquirer';
 
-const program = new Command();
+async function getProjectName(providedName) {
+  if (providedName) return providedName;
 
-program
-  .name('simpli')
-  .description('CLI to bootstrap simple working web applications')
-  .version('1.0.0');
-
-program
-  .command('create')
-  .description('Create a new project')
-  .argument('<project-name>', 'Name of the project')
-  .action(async (projectName) => {
-    try {
-      await createProject(projectName);
-    } catch (error) {
-      console.error(chalk.red('Error:'), error.message);
-      process.exit(1);
+  const response = await inquirer.prompt([{
+    type: 'input',
+    name: 'projectName',
+    message: 'What is your project name?',
+    validate: (input) => {
+      if (!input.trim()) return 'Project name is required';
+      return true;
     }
-  });
+  }]);
 
-program.parse(); 
+  return response.projectName;
+}
+
+async function run() {
+  try {
+    const args = process.argv.slice(2);
+    let projectName;
+
+    if (args[0] === 'create') {
+      projectName = await getProjectName(args[1]);
+    } else {
+      projectName = await getProjectName();
+    }
+
+    await createProject(projectName);
+  } catch (error) {
+    console.error('❌ Error:', error.message);
+    process.exit(1);
+  }
+}
+
+run(); 
