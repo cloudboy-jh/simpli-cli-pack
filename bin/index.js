@@ -9,7 +9,7 @@ const program = new Command();
 program
   .name('simpliv1')
   .description('A CLI tool to scaffold modern web applications')
-  .version('1.0.0');
+  .version('1.2.1');
 
 program
   .command('create')
