@@ -2,6 +2,9 @@
 
 import { createProject } from '../src/main.js';
 import inquirer from 'inquirer';
+import { Command } from 'commander';
+
+const program = new Command();
 
 async function getProjectName(providedName) {
   if (providedName) return providedName;
@@ -19,22 +22,23 @@ async function getProjectName(providedName) {
   return response.projectName;
 }
 
-async function run() {
-  try {
-    const args = process.argv.slice(2);
-    let projectName;
+program
+  .name('simpli')
+  .description('A CLI tool to scaffold modern web applications')
+  .version('1.0.2');
 
-    if (args[0] === 'create') {
-      projectName = await getProjectName(args[1]);
-    } else {
-      projectName = await getProjectName();
+program
+  .command('create')
+  .argument('[name]', 'project name')
+  .description('Create a new project')
+  .action(async (name) => {
+    try {
+      const projectName = await getProjectName(name);
+      await createProject(projectName);
+    } catch (error) {
+      console.error('❌ Error:', error.message);
+      process.exit(1);
     }
+  });
 
-    await createProject(projectName);
-  } catch (error) {
-    console.error('❌ Error:', error.message);
-    process.exit(1);
-  }
-}
-
-run(); 
+program.parse(); 
