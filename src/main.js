@@ -4,18 +4,6 @@ import fs from 'fs-extra';
 import { execa } from 'execa';
 import ora from 'ora';
 import path from 'path';
-import { fileURLToPath } from 'url';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
-const CHOICES = {
-  NEXT: 'Next.js',
-  TS: 'TypeScript',
-  TAILWIND: 'Tailwind CSS',
-  SUPABASE: 'Supabase',
-  OPENAI: 'OpenAI'
-};
 
 export async function createProject(projectName) {
   console.log(chalk.blue(`Creating new project: ${projectName}\n`));
@@ -24,69 +12,105 @@ export async function createProject(projectName) {
     {
       type: 'checkbox',
       name: 'features',
-      message: 'Select features to include:',
-      choices: Object.values(CHOICES),
-      default: [CHOICES.NEXT, CHOICES.TS, CHOICES.TAILWIND]
+      message: 'Select additional features to include:',
+      choices: [
+        { name: 'shadcn/ui Components', value: 'shadcn', checked: true },
+        { name: 'Lucide Icons', value: 'lucide', checked: true },
+        { name: 'Supabase', value: 'supabase' },
+        { name: 'OpenAI', value: 'openai' }
+      ]
     }
   ]);
 
-  const spinner = ora('Creating project directory...').start();
-
   try {
-    // Create project directory
-    const projectPath = path.join(process.cwd(), projectName);
-    await fs.ensureDir(projectPath);
+    // Step 1: Create Next.js project
+    console.log(chalk.yellow('\n📦 Installing Next.js (this might take a few minutes)...'));
+    const dependencies = [
+      ...(answers.features.includes('lucide') ? ['lucide-react'] : []),
+      ...(answers.features.includes('supabase') ? ['@supabase/supabase-js'] : []),
+      ...(answers.features.includes('openai') ? ['openai'] : [])
+    ];
 
-    // Copy template files
-    const templatePath = path.join(__dirname, '../templates/default');
-    await fs.copy(templatePath, projectPath);
+    await execa('npx', [
+      'create-next-app@latest',
+      projectName,
+      '--typescript',
+      '--tailwind',
+      '--eslint',
+      '--app',
+      '--src-dir',
+      '--import-alias', '@/*',
+      ...(dependencies.length > 0 ? ['--dependencies', ...dependencies] : [])
+    ], { stdio: 'inherit' });
 
-    spinner.succeed('Project directory created');
-    spinner.start('Installing dependencies...');
+    // Step 2: Set up shadcn/ui if selected
+    if (answers.features.includes('shadcn')) {
+      console.log(chalk.yellow('\n🎨 Setting up shadcn/ui...'));
+      await execa('npx', ['shadcn-ui@latest', 'init'], { 
+        cwd: projectName,
+        stdio: 'inherit'
+      });
+    }
 
-    // Install dependencies
-    const dependencies = getDependencies(answers.features);
-    
-    await execa('npm', ['init', '-y'], { 
-      cwd: projectPath,
-      stdio: 'inherit'
-    });
+    // Step 3: Create config files
+    if (answers.features.includes('supabase') || answers.features.includes('openai')) {
+      console.log(chalk.yellow('\n⚙️  Creating configuration files...'));
+      
+      if (!fs.existsSync(path.join(projectName, 'src/lib'))) {
+        fs.mkdirSync(path.join(projectName, 'src/lib'), { recursive: true });
+      }
 
-    await execa('npm', ['install', '--save', ...dependencies], { 
-      cwd: projectPath,
-      stdio: 'inherit'
-    });
+      if (answers.features.includes('supabase')) {
+        fs.writeFileSync(
+          path.join(projectName, 'src/lib/supabase.ts'),
+          `
+export const supabaseConfig = {
+  url: process.env.NEXT_PUBLIC_SUPABASE_URL || '',
+  key: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '',
+};
 
-    spinner.succeed('Dependencies installed');
+import { createClient } from '@supabase/supabase-js';
+export const supabase = createClient(supabaseConfig.url, supabaseConfig.key);
+`
+        );
+      }
 
-    console.log(chalk.green('\nProject created successfully! 🎉'));
+      if (answers.features.includes('openai')) {
+        fs.writeFileSync(
+          path.join(projectName, 'src/lib/openai.ts'),
+          `
+import OpenAI from 'openai';
+export const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+});
+`
+        );
+      }
+
+      // Create .env.local
+      const envContent = [
+        answers.features.includes('supabase') ? 
+          'NEXT_PUBLIC_SUPABASE_URL=your-project-url\nNEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key' : '',
+        answers.features.includes('openai') ? 
+          'OPENAI_API_KEY=your-openai-key' : ''
+      ].filter(Boolean).join('\n\n');
+
+      if (envContent) {
+        fs.writeFileSync(path.join(projectName, '.env.local'), envContent);
+      }
+    }
+
+    console.log(chalk.green('\n✨ Project created successfully!'));
     console.log(chalk.cyan('\nNext steps:'));
-    console.log(chalk.white(`  cd ${projectName}`));
-    console.log(chalk.white('  npm run dev'));
+    console.log(chalk.white(`  1. cd ${projectName}`));
+    if (answers.features.includes('supabase') || answers.features.includes('openai')) {
+      console.log(chalk.white('  2. Update your .env.local with your API keys'));
+      console.log(chalk.white('  3. npm run dev'));
+    } else {
+      console.log(chalk.white('  2. npm run dev'));
+    }
   } catch (error) {
-    spinner.fail('Failed to create project');
-    throw error;
+    console.error('❌ Error:', error.message);
+    process.exit(1);
   }
-}
-
-function getDependencies(features) {
-  const deps = ['react', 'react-dom'];
-
-  if (features.includes(CHOICES.NEXT)) {
-    deps.push('next');
-  }
-  if (features.includes(CHOICES.TS)) {
-    deps.push('typescript', '@types/react', '@types/node');
-  }
-  if (features.includes(CHOICES.TAILWIND)) {
-    deps.push('tailwindcss', 'postcss', 'autoprefixer');
-  }
-  if (features.includes(CHOICES.SUPABASE)) {
-    deps.push('@supabase/supabase-js');
-  }
-  if (features.includes(CHOICES.OPENAI)) {
-    deps.push('openai');
-  }
-
-  return deps;
 } 
