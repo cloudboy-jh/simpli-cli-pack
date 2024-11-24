@@ -23,14 +23,10 @@ async function getProjectName(providedName) {
 }
 
 program
-  .name('simpli')
+  .name('simpli-create')
   .description('A CLI tool to scaffold modern web applications')
-  .version('1.0.2');
-
-program
-  .command('create')
+  .version('1.0.0')
   .argument('[name]', 'project name')
-  .description('Create a new project')
   .action(async (name) => {
     try {
       const projectName = await getProjectName(name);

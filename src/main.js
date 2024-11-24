@@ -1,7 +1,7 @@
 import inquirer from 'inquirer';
 import chalk from 'chalk';
 import fs from 'fs-extra';
-import execa from 'execa';
+import { execa } from 'execa';
 import ora from 'ora';
 import path from 'path';
 import { fileURLToPath } from 'url';
