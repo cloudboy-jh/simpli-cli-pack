@@ -1,14 +1,31 @@
 #!/usr/bin/env node
 
 import { createProject } from '../src/main.js';
-import inquirer from 'inquirer';
 import { Command } from 'commander';
+import inquirer from 'inquirer';
 
 const program = new Command();
 
-async function getProjectName(providedName) {
-  if (providedName) return providedName;
+program
+  .name('simpliv1')
+  .description('A CLI tool to scaffold modern web applications')
+  .version('1.0.0');
 
+program
+  .command('create')
+  .argument('[name]', 'project name')
+  .description('Create a new project')
+  .action(async (name) => {
+    try {
+      const projectName = name || await askProjectName();
+      await createProject(projectName);
+    } catch (error) {
+      console.error('❌ Error:', error.message);
+      process.exit(1);
+    }
+  });
+
+async function askProjectName() {
   const response = await inquirer.prompt([{
     type: 'input',
     name: 'projectName',
@@ -18,23 +35,7 @@ async function getProjectName(providedName) {
       return true;
     }
   }]);
-
   return response.projectName;
 }
-
-program
-  .name('simpli-create')
-  .description('A CLI tool to scaffold modern web applications')
-  .version('1.0.0')
-  .argument('[name]', 'project name')
-  .action(async (name) => {
-    try {
-      const projectName = await getProjectName(name);
-      await createProject(projectName);
-    } catch (error) {
-      console.error('❌ Error:', error.message);
-      process.exit(1);
-    }
-  });
 
 program.parse(); 
